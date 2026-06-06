@@ -1,8 +1,9 @@
 package itkach.slob;
 
-import com.ibm.icu.text.CollationKey;
-import com.ibm.icu.text.Collator;
-import com.ibm.icu.text.RuleBasedCollator;
+import android.icu.compat.CollationKeyCompat;
+import android.icu.compat.CollatorCompat;
+import android.icu.compat.RuleBasedCollatorCompat;
+import android.os.Build;
 
 import org.tukaani.xz.LZMA2Options;
 
@@ -51,6 +52,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
     static final class ReadResult<T> {
         final T value;
         final int bytesRead;
+
         ReadResult(T value, int bytesRead) {
             this.value = value;
             this.bytesRead = bytesRead;
@@ -58,9 +60,9 @@ public final class Slob extends AbstractList<Slob.Blob> {
     }
 
     static {
-        register("lzma2", new Compressor(){
+        register("lzma2", new Compressor() {
 
-            LZMA2Options lzma2 = new LZMA2Options();
+            final LZMA2Options lzma2 = new LZMA2Options();
 
             @Override
             public byte[] decompress(byte[] input) throws IOException {
@@ -68,7 +70,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                 InputStream lis = lzma2.getInputStream(is);
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 while (true) {
-                    byte[] buf = new byte[input.length*8];
+                    byte[] buf = new byte[input.length * 8];
                     int count = lis.read(buf);
                     if (count < 0) {
                         break;
@@ -91,7 +93,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                 decompressor.setInput(input);
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 try {
-                    byte[] buf = new byte[input.length*4];
+                    byte[] buf = new byte[input.length * 4];
                     while (!decompressor.finished()) {
                         int count;
                         try {
@@ -101,8 +103,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                         }
                         out.write(buf, 0, count);
                     }
-                }
-                finally {
+                } finally {
                     out.close();
                 }
                 return out.toByteArray();
@@ -111,7 +112,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
     }
 
     static int toUnsignedByte(byte b) {
-        return 0x000000FF & ((int)b);
+        return 0x000000FF & ((int) b);
     }
 
     static int toUnsignedShort(byte[] bytes) {
@@ -124,8 +125,8 @@ public final class Slob extends AbstractList<Slob.Blob> {
         long result = 0;
         assert offset + SIZE_UINT <= bytes.length;
         int C = SIZE_UINT - 1;
-        for (int i = C; i >= 0 ; i--) {
-            result += (long)toUnsignedByte(bytes[offset + i]) << 8 * (C - i);
+        for (int i = C; i >= 0; i--) {
+            result += (long) toUnsignedByte(bytes[offset + i]) << 8 * (C - i);
         }
         return result;
     }
@@ -144,8 +145,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
     static String mkString(byte[] data, String encoding) {
         try {
             return new String(data, encoding);
-        }
-        catch (UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
@@ -159,8 +159,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             int cmp = c.compare(midVal, key);
             if (cmp < 0) {
                 lo = mid + 1;
-            }
-            else {
+            } else {
                 hi = mid;
             }
         }
@@ -168,54 +167,56 @@ public final class Slob extends AbstractList<Slob.Blob> {
     }
 
     enum SizeType {
-            UINT(4){
-
-                @Override
-                long read(SlobByteChannel f, long pos) throws IOException {
-                    return f.readUnsignedInt(pos);
-                }
-
-            } ,
-            ULONG(8) {
-                @Override
-                long read(SlobByteChannel f, long pos) throws IOException {
-                    return f.readLong(pos);
-                }
-            };
-
-            final int byteSize;
-
-            SizeType(int byteSize) {
-                this.byteSize = byteSize;
+        UINT(4) {
+            @Override
+            long read(SlobByteChannel f, long pos) throws IOException {
+                return f.readUnsignedInt(pos);
             }
 
-            abstract long read(SlobByteChannel f, long pos) throws IOException;
+        },
+        ULONG(8) {
+            @Override
+            long read(SlobByteChannel f, long pos) throws IOException {
+                return f.readLong(pos);
+            }
+        };
+
+        final int byteSize;
+
+        SizeType(int byteSize) {
+            this.byteSize = byteSize;
+        }
+
+        abstract long read(SlobByteChannel f, long pos) throws IOException;
     }
 
-    private static Map<Integer, Map<String, CollationKey>> collationCaches = new HashMap<Integer, Map<String, CollationKey>>(){
+    private static final Map<Integer, Map<String, CollationKeyCompat>> collationCaches
+            = new HashMap<Integer, Map<String, CollationKeyCompat>>() {
         {
-            put(Collator.QUATERNARY, newCollationKeyCache());
-            put(Collator.TERTIARY, newCollationKeyCache());
-            put(Collator.SECONDARY, newCollationKeyCache());
-            put(Collator.PRIMARY, newCollationKeyCache());
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                put(CollatorCompat.QUATERNARY, newCollationKeyCache());
+            }
+            put(CollatorCompat.TERTIARY, newCollationKeyCache());
+            put(CollatorCompat.SECONDARY, newCollationKeyCache());
+            put(CollatorCompat.PRIMARY, newCollationKeyCache());
         }
     };
 
     public enum Strength {
-        IDENTICAL(Collator.IDENTICAL),
-        QUATERNARY(Collator.QUATERNARY),
-        TERTIARY(Collator.TERTIARY),
-        SECONDARY(Collator.SECONDARY),
-        PRIMARY(Collator.PRIMARY),
-        QUATERNARY_PREFIX(true, Collator.QUATERNARY),
-        TERTIARY_PREFIX(true, Collator.TERTIARY),
-        SECONDARY_PREFIX(true, Collator.SECONDARY),
-        PRIMARY_PREFIX(true, Collator.PRIMARY);
+        IDENTICAL(CollatorCompat.IDENTICAL),
+        QUATERNARY(CollatorCompat.QUATERNARY),
+        TERTIARY(CollatorCompat.TERTIARY),
+        SECONDARY(CollatorCompat.SECONDARY),
+        PRIMARY(CollatorCompat.PRIMARY),
+        QUATERNARY_PREFIX(true, CollatorCompat.QUATERNARY),
+        TERTIARY_PREFIX(true, CollatorCompat.TERTIARY),
+        SECONDARY_PREFIX(true, CollatorCompat.SECONDARY),
+        PRIMARY_PREFIX(true, CollatorCompat.PRIMARY);
 
-        public final boolean        prefix;
-        public final int            level;
-        public final KeyComparator  comparator;
-        public final KeyComparator  stopComparator;
+        public final boolean prefix;
+        public final int level;
+        public final KeyComparator comparator;
+        public final KeyComparator stopComparator;
 
         Strength(int level) {
             this(false, level);
@@ -224,12 +225,11 @@ public final class Slob extends AbstractList<Slob.Blob> {
         Strength(boolean prefix, int level) {
             this.prefix = prefix;
             this.level = level;
-            Map<String, CollationKey> cache = collationCaches.get(level);
+            Map<String, CollationKeyCompat> cache = collationCaches.get(level);
             comparator = new KeyComparator(level, cache);
             if (prefix) {
                 stopComparator = new StartsWithKeyComparator(level, cache);
-            }
-            else {
+            } else {
                 stopComparator = comparator;
             }
         }
@@ -238,14 +238,14 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     public final static class UnknownFileFormatException extends IOException {
 
-        UnknownFileFormatException(){
+        UnknownFileFormatException() {
             super("Unknown file format");
         }
     }
 
     public final static class TruncatedFileException extends IOException {
 
-        TruncatedFileException(){
+        TruncatedFileException() {
             super("Truncated file");
         }
     }
@@ -339,7 +339,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
     }
 
     public final static class Content {
-        public final String     type;
+        public final String type;
         public final ByteBuffer data;
 
         Content(String type, ByteBuffer data) {
@@ -350,7 +350,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     public final static class Blob extends Keyed {
 
-        public final Slob   owner;
+        public final Slob owner;
         public final String id;
         public final String fragment;
 
@@ -436,10 +436,10 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     final static class ItemListInfo {
 
-        final long      count;
-        final long      posOffset;
-        final long      dataOffset;
-        final SizeType  posSize;
+        final long count;
+        final long posOffset;
+        final long dataOffset;
+        final SizeType posSize;
 
         ItemListInfo(long count, long posOffset, long dataOffset, SizeType posSize) {
             this.count = count;
@@ -458,7 +458,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         pos += countSize.byteSize;
         long posOffset = pos;
         SizeType posSize = offsetSize;
-        long dataOffset = posOffset + posSize.byteSize*count;
+        long dataOffset = posOffset + posSize.byteSize * count;
         return new ItemListInfo(count, posOffset, dataOffset, posSize);
     }
 
@@ -482,7 +482,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
 
         private long readPointer(long i) throws IOException {
-            long pos = this.posOffset + this.posSize.byteSize*i;
+            long pos = this.posOffset + this.posSize.byteSize * i;
             return this.posSize.read(this.file, pos);
         }
 
@@ -493,7 +493,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
 
         public int size() {
-            return (int)this.count;
+            return (int) this.count;
         }
 
         public T get(int i) {
@@ -504,8 +504,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             try {
                 long pointer = this.readPointer(i);
                 item = this.read(pointer);
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
             cache.put(i, item);
@@ -521,7 +520,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                        String encoding,
                        ItemListInfo info,
                        Map<Integer, Ref> cache) {
-            super(c,  info, cache);
+            super(c, info, cache);
             this.encoding = encoding;
         }
 
@@ -553,7 +552,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                        String encoding,
                        ItemListInfo info,
                        Map<Integer, Keyed> cache) {
-            super(file,  info, cache);
+            super(file, info, cache);
             this.encoding = encoding;
         }
 
@@ -580,14 +579,14 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
 
         protected ByteBuffer readItem(int offset) throws IOException {
-            int contentLength = (int)toUnsignedInt(this.binBytes, offset);
+            int contentLength = (int) toUnsignedInt(this.binBytes, offset);
             return ByteBuffer
                     .wrap(this.binBytes, offset + 4, contentLength)
                     .asReadOnlyBuffer();
         }
 
         protected int readPointer(int i) throws IOException {
-            return (int)toUnsignedInt(this.binBytes, this.posOffset + 4*i);
+            return (int) toUnsignedInt(this.binBytes, this.posOffset + 4 * i);
         }
 
         ByteBuffer read(int pointer) throws IOException {
@@ -610,10 +609,10 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     final static class StoreItem {
 
-        final int[]     contentTypeIds;
+        final int[] contentTypeIds;
 
-        private byte[]  compressedContent;
-        private Bin     bin;
+        private byte[] compressedContent;
+        private Bin bin;
 
         StoreItem(int[] contentTypeIds, byte[] compressedContent) {
             this.contentTypeIds = contentTypeIds;
@@ -644,7 +643,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                      List<String> contentTypes,
                      ItemListInfo info,
                      Map<Integer, StoreItem> cache
-                    ) {
+        ) {
             super(file, info, cache);
             this.compressor = compressor;
             this.contentTypes = contentTypes;
@@ -657,7 +656,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             long binItemCount = file.readUnsignedInt(position);
             position += SIZE_UINT;
 
-            int[] contentTypeIds = new int[(int)binItemCount];
+            int[] contentTypeIds = new int[(int) binItemCount];
             for (int i = 0; i < binItemCount; i++) {
                 contentTypeIds[i] = file.readUnsignedByte(position);
                 position += SIZE_UBYTE;
@@ -665,7 +664,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             long compressedLength = file.readUnsignedInt(position);
             position += SIZE_UINT;
             L.fine("Compressed length: " + compressedLength);
-            byte[] compressed = new byte[(int)compressedLength];
+            byte[] compressed = new byte[(int) compressedLength];
             file.read(compressed, position);
             L.fine("read compressed content bytes in " + (System.currentTimeMillis() - t0));
             return new StoreItem(contentTypeIds, compressed);
@@ -726,9 +725,9 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     public final Header header;
 
-    private Map<Integer, Ref> refCache = Collections.synchronizedMap(new LruCache<Integer, Ref>(256));
-    private Map<Integer, Keyed> keyCache = Collections.synchronizedMap(new LruCache<Integer, Keyed>(256));
-    private Map<Integer, StoreItem> storeCache = Collections.synchronizedMap(new LruCache<Integer, StoreItem>(4));
+    private final Map<Integer, Ref> refCache = Collections.synchronizedMap(new LruCache<Integer, Ref>(256));
+    private final Map<Integer, Keyed> keyCache = Collections.synchronizedMap(new LruCache<Integer, Keyed>(256));
+    private final Map<Integer, StoreItem> storeCache = Collections.synchronizedMap(new LruCache<Integer, StoreItem>(4));
 
     private final FileChannel file;
     public final String fileURI;
@@ -831,7 +830,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             position += valueR.bytesRead;
             tags.put(key, valueR.value);
         }
-        return new ReadResult<>(Collections.unmodifiableMap(tags), (int)(position - pos));
+        return new ReadResult<>(Collections.unmodifiableMap(tags), (int) (position - pos));
     }
 
     private ReadResult<List<String>> readContentTypes(SlobByteChannel f, String encoding, long pos) throws IOException {
@@ -844,7 +843,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             position += r.bytesRead;
             contentTypes.add(r.value);
         }
-        return new ReadResult<>(Collections.unmodifiableList(contentTypes), (int)(position - pos));
+        return new ReadResult<>(Collections.unmodifiableList(contentTypes), (int) (position - pos));
     }
 
     public UUID getId() {
@@ -881,7 +880,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     int[] splitBlobId(String blobId) {
         String[] parts = blobId.split("-", 2);
-        return new int[] {Integer.parseInt(parts[0]), Integer.parseInt(parts[1])};
+        return new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1])};
     }
 
     public String getContentType(String blobId) {
@@ -993,8 +992,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                     Blob matchedEntry = get(index);
                     nextEntry = (0 == stopComparator.compare(matchedEntry, lookupEntry)) ? matchedEntry : null;
                     index++;
-                }
-                else {
+                } else {
                     nextEntry = null;
                 }
             }
@@ -1017,18 +1015,18 @@ public final class Slob extends AbstractList<Slob.Blob> {
     }
 
 
-    public static class KeyComparator implements Comparator<Keyed>{
+    public static class KeyComparator implements Comparator<Keyed> {
 
-        protected Map<String, CollationKey> cache;
-        protected RuleBasedCollator collator;
+        protected Map<String, CollationKeyCompat> cache;
+        protected RuleBasedCollatorCompat collator;
 
-        public KeyComparator(int strength, Map<String, CollationKey> cache) {
+        public KeyComparator(int strength, Map<String, CollationKeyCompat> cache) {
             this(strength, cache, true);
         }
 
-        public KeyComparator(int strength, Map<String, CollationKey> cache, boolean alternateHandlingShifted) {
+        public KeyComparator(int strength, Map<String, CollationKeyCompat> cache, boolean alternateHandlingShifted) {
             try {
-                collator = (RuleBasedCollator)Collator.getInstance(Locale.ROOT).clone();
+                collator = CollatorCompat.clone(Locale.ROOT);
             } catch (CloneNotSupportedException e) {
                 throw new RuntimeException(e);
             }
@@ -1043,13 +1041,13 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
 
         public int compare(String k1, String k2) {
-            CollationKey ck1 = getCollationKey(k1);
-            CollationKey ck2 = getCollationKey(k2);
+            CollationKeyCompat ck1 = getCollationKey(k1);
+            CollationKeyCompat ck2 = getCollationKey(k2);
             return ck1.compareTo(ck2);
         }
 
-        public CollationKey getCollationKey(String key) {
-            CollationKey ck = cache.get(key);
+        public CollationKeyCompat getCollationKey(String key) {
+            CollationKeyCompat ck = cache.get(key);
             if (ck == null) {
                 synchronized (collator) {
                     ck = collator.getCollationKey(key);
@@ -1062,14 +1060,14 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     static class StartsWithKeyComparator extends KeyComparator {
 
-        public StartsWithKeyComparator(int strength, Map<String, CollationKey> cache) {
+        public StartsWithKeyComparator(int strength, Map<String, CollationKeyCompat> cache) {
             super(strength, cache);
         }
 
         @Override
         public int compare(Keyed o1, Keyed o2) {
-            CollationKey ck1 = getCollationKey(o1.key);
-            CollationKey ck2 = getCollationKey(o2.key);
+            CollationKeyCompat ck1 = getCollationKey(o1.key);
+            CollationKeyCompat ck2 = getCollationKey(o2.key);
 
             byte[] key1 = ck1.toByteArray();
             byte[] key2 = ck2.toByteArray();
@@ -1099,11 +1097,11 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
     }
 
-    private static Map<String, CollationKey> newCollationKeyCache() {
-        return Collections.synchronizedMap(new LruCache<String, CollationKey>(4096));
+    private static Map<String, CollationKeyCompat> newCollationKeyCache() {
+        return Collections.synchronizedMap(new LruCache<>(4096));
     }
 
-    public final static Iterator<Blob> EMPTY_RESULT = new Iterator<Blob>(){
+    public final static Iterator<Blob> EMPTY_RESULT = new Iterator<Blob>() {
 
         @Override
         public boolean hasNext() {
@@ -1125,7 +1123,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
     static final class FindResult {
 
         final Iterator<Blob> iterator;
-        final Strength       strength;
+        final Strength strength;
 
         FindResult(Iterator<Blob> iterator, Strength strength) {
             this.iterator = iterator;
@@ -1135,8 +1133,8 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     static final class MergeBufferItem {
 
-        final Blob           blob;
-        final Strength       strength;
+        final Blob blob;
+        final Strength strength;
 
         MergeBufferItem(Blob blob, Strength strength) {
             this.blob = blob;
@@ -1188,18 +1186,18 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
     }
 
-    public interface PeekableIterator<E> extends  Iterator<E> {
+    public interface PeekableIterator<E> extends Iterator<E> {
         E peek();
     }
 
     static final class MatchIterator implements PeekableIterator<Blob> {
 
-        private Set<String>                 seen = new HashSet<>();
-        private List<MergeBufferItem>       mergeBuffer;
-        private MergeBufferItemComparator   comparator;
-        private Map<Slob, FindResult>       iterators = new HashMap<>();
-        private String                      key;
-        private final Strength              upToStrength;
+        private Set<String> seen = new HashSet<>();
+        private List<MergeBufferItem> mergeBuffer;
+        private MergeBufferItemComparator comparator;
+        private Map<Slob, FindResult> iterators = new HashMap<>();
+        private String key;
+        private final Strength upToStrength;
 
         MatchIterator(Slob[] slobs, String key, Slob preferred, Strength upToStrength) {
             this.key = key;
@@ -1216,15 +1214,24 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
         Strength nextStrength(Strength s) {
             switch (s) {
-                case IDENTICAL: return Strength.QUATERNARY;
-                case QUATERNARY: return Strength.TERTIARY;
-                case TERTIARY: return Strength.SECONDARY;
-                case SECONDARY: return Strength.PRIMARY;
-                case PRIMARY: return Strength.QUATERNARY_PREFIX;
-                case QUATERNARY_PREFIX: return Strength.TERTIARY_PREFIX;
-                case TERTIARY_PREFIX: return Strength.SECONDARY_PREFIX;
-                case SECONDARY_PREFIX: return Strength.PRIMARY_PREFIX;
-                default: return null;
+                case IDENTICAL:
+                    return Strength.QUATERNARY;
+                case QUATERNARY:
+                    return Strength.TERTIARY;
+                case TERTIARY:
+                    return Strength.SECONDARY;
+                case SECONDARY:
+                    return Strength.PRIMARY;
+                case PRIMARY:
+                    return Strength.QUATERNARY_PREFIX;
+                case QUATERNARY_PREFIX:
+                    return Strength.TERTIARY_PREFIX;
+                case TERTIARY_PREFIX:
+                    return Strength.SECONDARY_PREFIX;
+                case SECONDARY_PREFIX:
+                    return Strength.PRIMARY_PREFIX;
+                default:
+                    return null;
             }
         }
 
@@ -1233,13 +1240,11 @@ public final class Slob extends AbstractList<Slob.Blob> {
             Strength strength;
             if (!iterators.containsKey(slob)) {
                 strength = Strength.QUATERNARY;
-            }
-            else {
+            } else {
                 FindResult currentResult = iterators.get(slob);
                 if (currentResult.strength == upToStrength) {
                     strength = null;
-                }
-                else {
+                } else {
                     strength = nextStrength(currentResult.strength);
                 }
             }
@@ -1249,8 +1254,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
             Iterator<Blob> iter;
             try {
                 iter = slob.find(this.key, strength);
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
                 L.log(Level.WARNING,
                         String.format("Lookup in %s from %s failed",
                                 slob.getId(), slob.file), ex);
@@ -1294,8 +1298,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         public Blob peek() {
             try {
                 Collections.sort(mergeBuffer, comparator);
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
                 L.log(Level.SEVERE, "Sorting merge buffer failed", ex);
             }
             return mergeBuffer.get(0).blob;
@@ -1304,8 +1307,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         public Blob next() {
             try {
                 Collections.sort(mergeBuffer, comparator);
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
                 L.log(Level.SEVERE, "Sorting merge buffer failed", ex);
             }
             MergeBufferItem result = mergeBuffer.remove(0);
@@ -1334,7 +1336,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         return find(key, slobs, preferred, null);
     }
 
-    public static PeekableIterator<Blob> find(String key, Slob ... slobs) {
+    public static PeekableIterator<Blob> find(String key, Slob... slobs) {
         return find(key, slobs, null, null);
     }
 

@@ -1,5 +1,5 @@
 plugins {
-    id 'java-library'
+    id 'com.android.library'
 }
 
 def getVersionName = {
@@ -7,20 +7,28 @@ def getVersionName = {
 }
 
 version = getVersionName()
-sourceCompatibility = '1.7'
 
 repositories {
+    google()
     mavenCentral()
+}
+
+android {
+    namespace 'itkach.slob'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 35
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
     testImplementation 'org.testng:testng:6.9.6'
     implementation 'org.tukaani:xz:1.9'
-    api 'com.ibm.icu:icu4j:68.1'
- }
-
-test {
-    useTestNG {
-
-    }
 }
