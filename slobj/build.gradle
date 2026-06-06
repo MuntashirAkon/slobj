@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.library'
+    id 'maven-publish'
+}
+
+group = 'io.github.muntashirakon'
+version = '1.0.0'
+
+android {
+    namespace "io.github.muntashirakon.slob"
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 35
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
+}
+
+publishing {
+    publications {
+        release(MavenPublication) {
+            artifactId = 'slobj'
+            afterEvaluate {
+                from components.release
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation "androidx.annotation:annotation:1.9.1"
+    implementation 'org.tukaani:xz:1.12'
+
+    testImplementation 'org.testng:testng:6.9.6'
+}

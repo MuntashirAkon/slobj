@@ -1,34 +1,30 @@
-plugins {
-    id 'com.android.library'
-}
-
-def getVersionName = {
-    return "git -C ${projectDir} describe --tags".execute().text.trim()
-}
-
-version = getVersionName()
-
-repositories {
-    google()
-    mavenCentral()
-}
-
-android {
-    namespace 'itkach.slob'
-    compileSdk 35
-
-    defaultConfig {
-        minSdk 21
-        targetSdk 35
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
     }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.9.2'
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
     }
 }
 
-dependencies {
-    testImplementation 'org.testng:testng:6.9.6'
-    implementation 'org.tukaani:xz:1.9'
+wrapper {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://jitpack.io" }
+    }
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile).tap {
+            configureEach {
+                options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+            }
+        }
+    }
 }

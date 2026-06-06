@@ -819,7 +819,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
 
     private ReadResult<Map<String, String>> readTags(SlobByteChannel f, String encoding, long pos) throws IOException {
         long position = pos;
-        HashMap<String, String> tags = new HashMap();
+        HashMap<String, String> tags = new HashMap<>();
         int length = f.readUnsignedByte(position);
         position += SIZE_UBYTE;
         for (int i = 0; i < length; i++) {
@@ -961,8 +961,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
         }
     }
 
-    private int indexOf(final Keyed lookupEntry, final Comparator comparator) {
-
+    private int indexOf(final Keyed lookupEntry, final Comparator<Keyed> comparator) {
         return binarySearch(keyList, lookupEntry, comparator);
     }
 
@@ -978,8 +977,7 @@ public final class Slob extends AbstractList<Slob.Blob> {
                     getTags().get("label"), key, strength, System.currentTimeMillis() - t0));
         }
 
-        Iterator<Blob> iterator = new Iterator<Blob>() {
-
+        return new Iterator<Blob>() {
             int index = initialIndex;
             Blob nextEntry;
 
@@ -1011,7 +1009,6 @@ public final class Slob extends AbstractList<Slob.Blob> {
                 throw new UnsupportedOperationException();
             }
         };
-        return iterator;
     }
 
 

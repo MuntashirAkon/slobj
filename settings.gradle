@@ -1,9 +1,2 @@
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        google()
-        mavenCentral()
-    }
-}
-
+include ':slobj'
 rootProject.name = "slobj"
